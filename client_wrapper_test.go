@@ -2,6 +2,7 @@ package cometbft_client
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -10,96 +11,88 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const url = "https://rpc.osmosis.strange.love:80"
+const url = "https://rpc.osmosis.strange.love:443"
 
 // TODO: this hardcoded value makes the test brittle since the underlying node may not have this state persisted
 var blockHeight = int64(13311684)
 
+func testClient(t *testing.T) *Client {
+	client, err := NewClient(url, 5*time.Second)
+	require.NoError(t, err, "failed to initialize client")
+
+	return client
+}
+
 func TestClientStatus(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.Status(context.Background())
-	if err != nil {
-		t.Fatalf("Failed to get client status: %v", err)
-	}
+	require.NoError(t, err, "failed to get client status")
 
-	t.Logf("Status Resp: %v \n", res)
+	resJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	t.Logf("Status Resp: %s \n", resJson)
 }
 
 func TestBlockResults(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.BlockResults(context.Background(), nil)
-	if err != nil {
-		t.Fatalf("Failed to get block results: %v", err)
-	}
+	require.NoError(t, err, "failed to get block results")
 
-	t.Logf("Block Results: %v \n", res)
+	resJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	t.Logf("Block Results: %s \n", resJson)
 }
 
 func TestABCIInfo(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.ABCIInfo(context.Background())
-	if err != nil {
-		t.Fatalf("Failed to get ABCI info: %v", err)
-	}
+	require.NoError(t, err, "failed to get ABCI info")
 
-	t.Logf("ABCI Info: %v \n", res)
+	resJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	t.Logf("ABCI Info: %s \n", resJson)
 }
 
 func TestABCIQuery(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	// TODO: pass in valid values for path and data
 	path := ""
 	data := bytes.HexBytes{}
 
 	res, err := client.RPCClient.ABCIQuery(context.Background(), path, data)
-	if err != nil {
-		t.Fatalf("Failed to query ABCI: %v", err)
-	}
+	require.NoError(t, err, "failed to query ABCI")
 
-	t.Logf("ABCI Query: %v \n", res)
+	require.Equal(t, uint32(6), res.Response.Code)
+	require.Equal(t, "no query path provided: unknown request", res.Response.Log)
+	require.Equal(t, "sdk", res.Response.Codespace)
+
+	resJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	t.Logf("ABCI Query: %s \n", resJson)
 }
 
 func TestBlockByHeight(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
-	res, err := client.BlockResults(context.Background(), &blockHeight)
-	if err != nil {
-		t.Fatalf("Failed to get block results: %v", err)
-	}
+	res, err := client.RPCClient.BlockResults(context.Background(), &blockHeight)
+	require.NoError(t, err, "failed to get block results")
 
-	t.Logf("Block Results: %v \n", res)
+	resJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	t.Logf("Block Results: %s \n", resJson)
 }
 
 func TestConsensusParams(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.ConsensusParams(context.Background(), &blockHeight)
 	if err != nil {
@@ -110,11 +103,7 @@ func TestConsensusParams(t *testing.T) {
 }
 
 func TestConsensusState(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.ConsensusState(context.Background())
 	if err != nil {
@@ -125,11 +114,7 @@ func TestConsensusState(t *testing.T) {
 }
 
 func TestDumpConsensusState(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.DumpConsensusState(context.Background())
 	if err != nil {
@@ -140,11 +125,7 @@ func TestDumpConsensusState(t *testing.T) {
 }
 
 func TestGenesis(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.Genesis(context.Background())
 	if err != nil && !strings.Contains(err.Error(), "genesis response is large, please use the genesis_chunked API instead") {
@@ -155,11 +136,7 @@ func TestGenesis(t *testing.T) {
 }
 
 func TestGenesisChunked(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 30*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	chunk := uint(1)
 	res, err := client.RPCClient.GenesisChunked(context.Background(), chunk)
@@ -171,11 +148,7 @@ func TestGenesisChunked(t *testing.T) {
 }
 
 func TestHealth(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.Health(context.Background())
 	if err != nil {
@@ -186,11 +159,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestNetInfo(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.NetInfo(context.Background())
 	if err != nil {
@@ -201,11 +170,7 @@ func TestNetInfo(t *testing.T) {
 }
 
 func TestNumUnconfirmedTxs(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	res, err := client.RPCClient.NumUnconfirmedTxs(context.Background())
 	if err != nil {
@@ -216,11 +181,7 @@ func TestNumUnconfirmedTxs(t *testing.T) {
 }
 
 func TestUnconfirmedTxs(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	limit := 5
 	res, err := client.RPCClient.UnconfirmedTxs(context.Background(), &limit)
@@ -233,11 +194,7 @@ func TestUnconfirmedTxs(t *testing.T) {
 }
 
 func TestValidators(t *testing.T) {
-	client := NewClient()
-	err := client.Init(url, "0.37.2", 5*time.Second)
-	if err != nil {
-		t.Fatalf("Failed to initialize client: %v", err)
-	}
+	client := testClient(t)
 
 	page := 1
 	perPage := 5
