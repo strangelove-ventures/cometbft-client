@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
+	_ "github.com/strangelove-ventures/cometbft-client/crypto/encoding"
 	rpcclient "github.com/strangelove-ventures/cometbft-client/rpc/client"
 	rpchttp "github.com/strangelove-ventures/cometbft-client/rpc/client/http"
 	jsonrpc "github.com/strangelove-ventures/cometbft-client/rpc/jsonrpc/client"
-	"golang.org/x/mod/semver"
 )
 
-const cometBlockResultsThreshold = "v0.38.0-alpha"
+// const cometBlockResultsThreshold = "v0.38.0-alpha"
 
 // Client is a wrapper around the CometBFT RPC client.
 type Client struct {
@@ -94,6 +94,6 @@ func newRPCClient(addr string, timeout time.Duration) (*rpchttp.HTTP, error) {
 	return rpcClient, nil
 }
 
-func (c *Client) legacyBlockResults(version string) bool {
-	return semver.Compare("v"+version, cometBlockResultsThreshold) < 0
-}
+// func (c *Client) legacyBlockResults(version string) bool {
+// 	return semver.Compare("v"+version, cometBlockResultsThreshold) < 0
+// }

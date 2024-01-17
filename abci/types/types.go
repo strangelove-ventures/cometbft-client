@@ -1,5 +1,7 @@
 package types
 
+import "github.com/strangelove-ventures/cometbft-client/proto/tendermint/crypto"
+
 const (
 	CodeTypeOK uint32 = 0
 )
@@ -8,8 +10,8 @@ const (
 type ValidatorUpdates []ValidatorUpdate
 
 type ValidatorUpdate struct {
-	PubKey []byte `protobuf:"bytes,1,opt,name=pub_key,json=pubKey,proto3" json:"pub_key"`
-	Power  int64  `protobuf:"varint,2,opt,name=power,proto3" json:"power,omitempty"`
+	PubKey crypto.PublicKey `protobuf:"bytes,1,opt,name=pub_key,json=pubKey,proto3" json:"pub_key"`
+	Power  int64            `protobuf:"varint,2,opt,name=power,proto3" json:"power,omitempty"`
 }
 
 type ExecTxResult struct {
