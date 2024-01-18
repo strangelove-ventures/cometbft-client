@@ -3,7 +3,6 @@ package types
 import (
 	"time"
 
-	"github.com/strangelove-ventures/cometbft-client/libs/bits"
 	cmtbytes "github.com/strangelove-ventures/cometbft-client/libs/bytes"
 	cmtsync "github.com/strangelove-ventures/cometbft-client/libs/sync"
 )
@@ -89,11 +88,6 @@ type Commit struct {
 	Round      int32       `json:"round"`
 	BlockID    BlockID     `json:"block_id"`
 	Signatures []CommitSig `json:"signatures"`
-
-	// Memoized in first call to corresponding method.
-	// NOTE: can't memoize in constructor because constructor isn't used for
-	// unmarshaling.
-	hash cmtbytes.HexBytes
 }
 
 //-------------------------------------
@@ -105,8 +99,6 @@ type ExtendedCommit struct {
 	Round              int32
 	BlockID            BlockID
 	ExtendedSignatures []ExtendedCommitSig
-
-	bitArray *bits.BitArray
 }
 
 //-------------------------------------

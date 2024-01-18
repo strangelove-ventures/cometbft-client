@@ -1,24 +1,28 @@
 package types
 
-import (
-	"bytes"
-	"encoding/json"
-
-	"github.com/cosmos/gogoproto/jsonpb"
-)
+import "github.com/strangelove-ventures/cometbft-client/proto/tendermint/crypto"
 
 const (
 	CodeTypeOK uint32 = 0
 )
 
-// IsOK returns true if Code is OK.
-func (r ResponseCheckTx) IsOK() bool {
-	return r.Code == CodeTypeOK
+// ValidatorUpdates is a list of validators that implements the Sort interface
+type ValidatorUpdates []ValidatorUpdate
+
+type ValidatorUpdate struct {
+	PubKey crypto.PublicKey `protobuf:"bytes,1,opt,name=pub_key,json=pubKey,proto3" json:"pub_key"`
+	Power  int64            `protobuf:"varint,2,opt,name=power,proto3" json:"power,omitempty"`
 }
 
-// IsErr returns true if Code is something other than OK.
-func (r ResponseCheckTx) IsErr() bool {
-	return r.Code != CodeTypeOK
+type ExecTxResult struct {
+	Code      uint32  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Data      []byte  `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Log       string  `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`
+	Info      string  `protobuf:"bytes,4,opt,name=info,proto3" json:"info,omitempty"`
+	GasWanted int64   `protobuf:"varint,5,opt,name=gas_wanted,proto3" json:"gas_wanted,omitempty"`
+	GasUsed   int64   `protobuf:"varint,6,opt,name=gas_used,proto3" json:"gas_used,omitempty"`
+	Events    []Event `protobuf:"bytes,7,rep,name=events,proto3" json:"events,omitempty"`
+	Codespace string  `protobuf:"bytes,8,opt,name=codespace,proto3" json:"codespace,omitempty"`
 }
 
 // IsOK returns true if Code is OK.
@@ -31,140 +35,66 @@ func (r ExecTxResult) IsErr() bool {
 	return r.Code != CodeTypeOK
 }
 
-// IsOK returns true if Code is OK.
-func (r ResponseQuery) IsOK() bool {
-	return r.Code == CodeTypeOK
-}
-
-// IsErr returns true if Code is something other than OK.
-func (r ResponseQuery) IsErr() bool {
-	return r.Code != CodeTypeOK
-}
-
-// IsAccepted returns true if Code is ACCEPT
-func (r ResponseProcessProposal) IsAccepted() bool {
-	return r.Status == ResponseProcessProposal_ACCEPT
-}
-
-// IsStatusUnknown returns true if Code is UNKNOWN
-func (r ResponseProcessProposal) IsStatusUnknown() bool {
-	return r.Status == ResponseProcessProposal_UNKNOWN
-}
-
-func (r ResponseVerifyVoteExtension) IsAccepted() bool {
-	return r.Status == ResponseVerifyVoteExtension_ACCEPT
-}
-
-// IsStatusUnknown returns true if Code is Unknown
-func (r ResponseVerifyVoteExtension) IsStatusUnknown() bool {
-	return r.Status == ResponseVerifyVoteExtension_UNKNOWN
-}
-
-//---------------------------------------------------------------------------
-// override JSON marshaling so we emit defaults (ie. disable omitempty)
-
-var (
-	jsonpbMarshaller = jsonpb.Marshaler{
-		EnumsAsInts:  true,
-		EmitDefaults: true,
-	}
-	jsonpbUnmarshaller = jsonpb.Unmarshaler{}
-)
-
-func (r *ResponseCheckTx) MarshalJSON() ([]byte, error) {
-	s, err := jsonpbMarshaller.MarshalToString(r)
-	return []byte(s), err
-}
-
-func (r *ResponseCheckTx) UnmarshalJSON(b []byte) error {
-	reader := bytes.NewBuffer(b)
-	return jsonpbUnmarshaller.Unmarshal(reader, r)
-}
-
-func (r *ExecTxResult) MarshalJSON() ([]byte, error) {
-	s, err := jsonpbMarshaller.MarshalToString(r)
-	return []byte(s), err
-}
-
-func (r *ExecTxResult) UnmarshalJSON(b []byte) error {
-	reader := bytes.NewBuffer(b)
-	return jsonpbUnmarshaller.Unmarshal(reader, r)
-}
-
-func (r *ResponseQuery) MarshalJSON() ([]byte, error) {
-	s, err := jsonpbMarshaller.MarshalToString(r)
-	return []byte(s), err
-}
-
-func (r *ResponseQuery) UnmarshalJSON(b []byte) error {
-	reader := bytes.NewBuffer(b)
-	return jsonpbUnmarshaller.Unmarshal(reader, r)
-}
-
-func (r *ResponseCommit) MarshalJSON() ([]byte, error) {
-	s, err := jsonpbMarshaller.MarshalToString(r)
-	return []byte(s), err
-}
-
-func (r *ResponseCommit) UnmarshalJSON(b []byte) error {
-	reader := bytes.NewBuffer(b)
-	return jsonpbUnmarshaller.Unmarshal(reader, r)
-}
-
-func (r *EventAttribute) MarshalJSON() ([]byte, error) {
-	s, err := jsonpbMarshaller.MarshalToString(r)
-	return []byte(s), err
-}
-
-func (r *EventAttribute) UnmarshalJSON(b []byte) error {
-	reader := bytes.NewBuffer(b)
-	return jsonpbUnmarshaller.Unmarshal(reader, r)
-}
-
-// Some compile time assertions to ensure we don't
-// have accidental runtime surprises later on.
-
-// jsonEncodingRoundTripper ensures that asserted
-// interfaces implement both MarshalJSON and UnmarshalJSON
-type jsonRoundTripper interface {
-	json.Marshaler
-	json.Unmarshaler
-}
-
-var _ jsonRoundTripper = (*ResponseCommit)(nil)
-var _ jsonRoundTripper = (*ResponseQuery)(nil)
-var _ jsonRoundTripper = (*ExecTxResult)(nil)
-var _ jsonRoundTripper = (*ResponseCheckTx)(nil)
-
-var _ jsonRoundTripper = (*EventAttribute)(nil)
-
-// deterministicExecTxResult constructs a copy of response that omits
-// non-deterministic fields. The input response is not modified.
-func deterministicExecTxResult(response *ExecTxResult) *ExecTxResult {
-	return &ExecTxResult{
-		Code:      response.Code,
-		Data:      response.Data,
-		GasWanted: response.GasWanted,
-		GasUsed:   response.GasUsed,
-	}
-}
-
-// MarshalTxResults encodes the the TxResults as a list of byte
-// slices. It strips off the non-deterministic pieces of the TxResults
-// so that the resulting data can be used for hash comparisons and used
-// in Merkle proofs.
-func MarshalTxResults(r []*ExecTxResult) ([][]byte, error) {
-	s := make([][]byte, len(r))
-	for i, e := range r {
-		d := deterministicExecTxResult(e)
-		b, err := d.Marshal()
-		if err != nil {
-			return nil, err
-		}
-		s[i] = b
-	}
-	return s, nil
-}
-
 // -----------------------------------------------
 // construct Result data
+
+// Event allows application developers to attach additional information to
+// ResponseFinalizeBlock and ResponseCheckTx.
+// Later, transactions may be queried using these events.
+type Event struct {
+	Type       string           `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Attributes []EventAttribute `protobuf:"bytes,2,rep,name=attributes,proto3" json:"attributes,omitempty"`
+}
+
+// EventAttribute is a single key-value pair, associated with an event.
+type EventAttribute struct {
+	Key   string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Index bool   `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
+}
+
+type ResponseInfo struct {
+	Data             string `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Version          string `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	AppVersion       uint64 `protobuf:"varint,3,opt,name=app_version,json=appVersion,proto3" json:"app_version,omitempty"`
+	LastBlockHeight  int64  `protobuf:"varint,4,opt,name=last_block_height,json=lastBlockHeight,proto3" json:"last_block_height,omitempty"`
+	LastBlockAppHash []byte `protobuf:"bytes,5,opt,name=last_block_app_hash,json=lastBlockAppHash,proto3" json:"last_block_app_hash,omitempty"`
+}
+
+type ResponseQuery struct {
+	Code uint32 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	// bytes data = 2; // use "value" instead.
+	Log       string    `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`
+	Info      string    `protobuf:"bytes,4,opt,name=info,proto3" json:"info,omitempty"`
+	Index     int64     `protobuf:"varint,5,opt,name=index,proto3" json:"index,omitempty"`
+	Key       []byte    `protobuf:"bytes,6,opt,name=key,proto3" json:"key,omitempty"`
+	Value     []byte    `protobuf:"bytes,7,opt,name=value,proto3" json:"value,omitempty"`
+	ProofOps  *ProofOps `protobuf:"bytes,8,opt,name=proof_ops,json=proofOps,proto3" json:"proof_ops,omitempty"`
+	Height    int64     `protobuf:"varint,9,opt,name=height,proto3" json:"height,omitempty"`
+	Codespace string    `protobuf:"bytes,10,opt,name=codespace,proto3" json:"codespace,omitempty"`
+}
+
+// ProofOps is Merkle proof defined by the list of ProofOps
+type ProofOps struct {
+	Ops []ProofOp `protobuf:"bytes,1,rep,name=ops,proto3" json:"ops"`
+}
+
+// ProofOp defines an operation used for calculating Merkle root
+// The data could be arbitrary format, providing nessecary data
+// for example neighbouring node hash
+type ProofOp struct {
+	Type string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Key  []byte `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Data []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+type ResponseCheckTx struct {
+	Code      uint32  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Data      []byte  `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Log       string  `protobuf:"bytes,3,opt,name=log,proto3" json:"log,omitempty"`
+	Info      string  `protobuf:"bytes,4,opt,name=info,proto3" json:"info,omitempty"`
+	GasWanted int64   `protobuf:"varint,5,opt,name=gas_wanted,proto3" json:"gas_wanted,omitempty"`
+	GasUsed   int64   `protobuf:"varint,6,opt,name=gas_used,proto3" json:"gas_used,omitempty"`
+	Events    []Event `protobuf:"bytes,7,rep,name=events,proto3" json:"events,omitempty"`
+	Codespace string  `protobuf:"bytes,8,opt,name=codespace,proto3" json:"codespace,omitempty"`
+}
