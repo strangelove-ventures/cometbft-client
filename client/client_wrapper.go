@@ -8,14 +8,17 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	abci "github.com/strangelove-ventures/cometbft-client/abci/types"
 	_ "github.com/strangelove-ventures/cometbft-client/crypto/encoding"
+	"github.com/strangelove-ventures/cometbft-client/libs/bytes"
 	rpcclient "github.com/strangelove-ventures/cometbft-client/rpc/client"
 	rpchttp "github.com/strangelove-ventures/cometbft-client/rpc/client/http"
+	coretypes "github.com/strangelove-ventures/cometbft-client/rpc/core/types"
 	jsonrpc "github.com/strangelove-ventures/cometbft-client/rpc/jsonrpc/client"
+	"github.com/strangelove-ventures/cometbft-client/types"
 )
 
 // Client is a wrapper around the CometBFT RPC client.
 type Client struct {
-	rpcclient.Client
+	rpcClient rpcclient.Client
 }
 
 // NewClient returns a pointer to a new instance of Client.
@@ -28,38 +31,204 @@ func NewClient(addr string, timeout time.Duration) (*Client, error) {
 	return &Client{rpcClient}, nil
 }
 
-// GetBlockResults fetches the block results at a specific height,
+// BlockResults fetches the block results at a specific height,
 // it then parses the tx results and block events into our generalized types.
 // This allows us to maintain backwards compatability with older versions of CometBFT.
-func (c *Client) GetBlockResults(ctx context.Context, height *int64) (*Results, error) {
-	res, err := c.BlockResults(ctx, height)
+func (c *Client) BlockResults(ctx context.Context, height *int64) (*BlockResponse, error) {
+	res, err := c.rpcClient.BlockResults(ctx, height)
 	if err != nil {
 		return nil, err
 	}
 
-	var txRes []*TxResult
+	var txRes []*ExecTxResponse
 	for _, tx := range res.TxsResults {
-		txRes = append(txRes, &TxResult{
-			Code:   tx.Code,
-			Events: parseEvents(tx.Events),
+		txRes = append(txRes, &ExecTxResponse{
+			Code:      tx.Code,
+			Data:      tx.Data,
+			Log:       tx.Log,
+			Info:      tx.Info,
+			GasWanted: tx.GasWanted,
+			GasUsed:   tx.GasUsed,
+			Events:    parseEvents(tx.Events),
+			Codespace: tx.Codespace,
 		})
 	}
 
-	if (res.BeginBlockEvents != nil && len(res.BeginBlockEvents) > 0) &&
-		(res.EndBlockEvents != nil && len(res.EndBlockEvents) > 0) {
-		events := res.BeginBlockEvents
-		events = append(events, res.EndBlockEvents...)
-
-		return &Results{
-			TxsResults: txRes,
-			Events:     parseEvents(events),
+	if res.FinalizeBlockEvents != nil && len(res.FinalizeBlockEvents) > 0 {
+		return &BlockResponse{
+			Height:           res.Height,
+			TxResponses:      txRes,
+			Events:           parseEvents(res.FinalizeBlockEvents),
+			ValidatorUpdates: res.ValidatorUpdates,
+			AppHash:          res.AppHash,
 		}, nil
 	}
 
-	return &Results{
-		TxsResults: txRes,
-		Events:     parseEvents(res.FinalizeBlockEvents),
+	events := res.BeginBlockEvents
+	events = append(events, res.EndBlockEvents...)
+
+	return &BlockResponse{
+		Height:           res.Height,
+		TxResponses:      txRes,
+		Events:           parseEvents(events),
+		ValidatorUpdates: res.ValidatorUpdates,
+		AppHash:          res.AppHash,
 	}, nil
+}
+
+func (c *Client) Tx(ctx context.Context, hash []byte, prove bool) (*TxResponse, error) {
+	res, err := c.rpcClient.Tx(ctx, hash, prove)
+	if err != nil {
+		return nil, err
+	}
+
+	execTx := ExecTxResponse{
+		Code:      res.TxResult.Code,
+		Data:      res.TxResult.Data,
+		Log:       res.TxResult.Log,
+		Info:      res.TxResult.Info,
+		GasWanted: res.TxResult.GasWanted,
+		GasUsed:   res.TxResult.GasUsed,
+		Events:    parseEvents(res.TxResult.Events),
+		Codespace: res.TxResult.Codespace,
+	}
+
+	return &TxResponse{
+		Hash:   res.Hash,
+		Height: res.Height,
+		Index:  res.Index,
+		ExecTx: execTx,
+		Tx:     res.Tx,
+		Proof:  res.Proof,
+	}, nil
+}
+
+func (c *Client) TxSearch(
+	ctx context.Context,
+	query string,
+	prove bool,
+	page *int,
+	perPage *int,
+	orderBy string,
+) ([]*TxResponse, error) {
+	res, err := c.rpcClient.TxSearch(ctx, query, prove, page, perPage, orderBy)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*TxResponse, 0, len(res.Txs))
+
+	for i, tx := range res.Txs {
+		execTx := ExecTxResponse{
+			Code:      tx.TxResult.Code,
+			Data:      tx.TxResult.Data,
+			Log:       tx.TxResult.Log,
+			Info:      tx.TxResult.Info,
+			GasWanted: tx.TxResult.GasWanted,
+			GasUsed:   tx.TxResult.GasUsed,
+			Events:    parseEvents(tx.TxResult.Events),
+			Codespace: tx.TxResult.Codespace,
+		}
+
+		result[i] = &TxResponse{
+			Hash:   tx.Hash,
+			Height: tx.Height,
+			Index:  tx.Index,
+			ExecTx: execTx,
+			Tx:     tx.Tx,
+			Proof:  tx.Proof,
+		}
+	}
+
+	return result, nil
+}
+
+func (c *Client) Commit(ctx context.Context, height *int64) (*coretypes.ResultCommit, error) {
+	res, err := c.rpcClient.Commit(ctx, height)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) Validators(
+	ctx context.Context,
+	height *int64,
+	page *int,
+	perPage *int,
+) (*coretypes.ResultValidators, error) {
+	res, err := c.rpcClient.Validators(ctx, height, page, perPage)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) Status(ctx context.Context) (*coretypes.ResultStatus, error) {
+	res, err := c.rpcClient.Status(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) Block(ctx context.Context, height *int64) (*coretypes.ResultBlock, error) {
+	res, err := c.rpcClient.Block(ctx, height)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) BlockSearch(
+	ctx context.Context,
+	query string,
+	page *int,
+	perPage *int,
+	orderBy string,
+) (*coretypes.ResultBlockSearch, error) {
+	res, err := c.rpcClient.BlockSearch(ctx, query, page, perPage, orderBy)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) BroadcastTxAsync(ctx context.Context, tx types.Tx) (*coretypes.ResultBroadcastTx, error) {
+	res, err := c.rpcClient.BroadcastTxAsync(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) BroadcastTxSync(ctx context.Context, tx types.Tx) (*coretypes.ResultBroadcastTx, error) {
+	res, err := c.rpcClient.BroadcastTxSync(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) ABCIQueryWithOptions(
+	ctx context.Context,
+	path string,
+	data bytes.HexBytes,
+	opts rpcclient.ABCIQueryOptions,
+) (*coretypes.ResultABCIQuery, error) {
+	res, err := c.rpcClient.ABCIQueryWithOptions(ctx, path, data, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func newRPCClient(addr string, timeout time.Duration) (*rpchttp.HTTP, error) {
@@ -93,7 +262,7 @@ func parseEvents(events []abci.Event) sdk.StringEvents {
 // base64DecodeEvents attempts to base64 decode a slice of Event objects.
 // An error is returned if base64 decoding any event in the slice fails.
 func base64DecodeEvents(events []abci.Event) (sdk.StringEvents, error) {
-	sdkEvents := make(sdk.StringEvents, 0, len(events))
+	sdkEvents := make(sdk.StringEvents, len(events))
 
 	for i, event := range events {
 		evt := sdk.StringEvent{Type: event.Type}
