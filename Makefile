@@ -11,3 +11,7 @@ lint: ## Run golangci-lint
 .PHONY: lint-fix
 lint-fix: ## Run golangci-lint with the --fix flag to fix linter errors
 	golangci-lint run --fix --out-format=tab --issues-exit-code=0
+
+.PHONY: test
+test: ## Run the Go unit tests
+	go test -race -v ./...
