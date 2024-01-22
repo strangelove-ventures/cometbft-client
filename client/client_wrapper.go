@@ -199,6 +199,24 @@ func (c *Client) BlockSearch(
 	return res, nil
 }
 
+func (c *Client) BlockByHash(ctx context.Context, hash []byte) (*coretypes.ResultBlock, error) {
+	res, err := c.rpcClient.BlockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) BlockchainInfo(ctx context.Context, minHeight int64, maxHeight int64) (*coretypes.ResultBlockchainInfo, error) {
+	res, err := c.rpcClient.BlockchainInfo(ctx, minHeight, maxHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 func (c *Client) BroadcastTxAsync(ctx context.Context, tx types.Tx) (*coretypes.ResultBroadcastTx, error) {
 	res, err := c.rpcClient.BroadcastTxAsync(ctx, tx)
 	if err != nil {
@@ -210,6 +228,33 @@ func (c *Client) BroadcastTxAsync(ctx context.Context, tx types.Tx) (*coretypes.
 
 func (c *Client) BroadcastTxSync(ctx context.Context, tx types.Tx) (*coretypes.ResultBroadcastTx, error) {
 	res, err := c.rpcClient.BroadcastTxSync(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) BroadcastTxCommit(ctx context.Context, tx types.Tx) (*coretypes.ResultBroadcastTxCommit, error) {
+	res, err := c.rpcClient.BroadcastTxCommit(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) ABCIInfo(ctx context.Context) (*coretypes.ResultABCIInfo, error) {
+	res, err := c.rpcClient.ABCIInfo(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (c *Client) ABCIQuery(ctx context.Context, path string, data bytes.HexBytes) (*coretypes.ResultABCIQuery, error) {
+	res, err := c.rpcClient.ABCIQuery(ctx, path, data)
 	if err != nil {
 		return nil, err
 	}
