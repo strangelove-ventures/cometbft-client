@@ -116,7 +116,7 @@ func (c *Client) TxSearch(
 		return nil, err
 	}
 
-	result := make([]*TxResponse, 0, len(res.Txs))
+	result := make([]*TxResponse, len(res.Txs))
 
 	for i, tx := range res.Txs {
 		execTx := ExecTxResponse{
