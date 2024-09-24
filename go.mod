@@ -3,8 +3,8 @@ module github.com/strangelove-ventures/cometbft-client
 go 1.21
 
 require (
-	github.com/btcsuite/btcd/btcec/v2 v2.3.2
-	github.com/btcsuite/btcd/btcutil v1.1.5
+	github.com/btcsuite/btcd/btcec/v2 v2.3.4
+	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/cosmos/cosmos-sdk v0.50.3
 	github.com/cosmos/gogoproto v1.4.11
 	github.com/go-kit/log v0.2.1
